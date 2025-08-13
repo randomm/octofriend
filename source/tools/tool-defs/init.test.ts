@@ -17,6 +17,13 @@ describe('init tool security tests', () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'init-test-'));
     
     mockConfig = {
+      yourName: 'test-user',
+      models: [{
+        nickname: 'test-model',
+        baseUrl: 'http://localhost',
+        model: 'test',
+        context: 4096
+      }],
       mcpServers: {
         'test-server': {
           command: 'echo',
@@ -46,8 +53,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: attack }
-          }
-        }, mockConfig)
+          },
+          id: 1n
+        }, mockConfig, null)
       ).rejects.toThrow('Project initialization failed. Please check the project path and permissions.');
     });
 
@@ -59,8 +67,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: attack }
-          }
-        }, mockConfig)
+          },
+          id: 2n
+        }, mockConfig, null)
       ).rejects.toThrow('Project initialization failed. Please check the project path and permissions.');
     });
 
@@ -72,8 +81,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: attack }
-          }
-        }, mockConfig)
+          },
+          id: 3n
+        }, mockConfig, null)
       ).rejects.toThrow('Project initialization failed. Please check the project path and permissions.');
     });
 
@@ -106,8 +116,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: projectName }
-          }
-        }, mockConfig);
+          },
+          id: 4n
+        }, mockConfig, null);
 
         expect(result).toContain('Project initialized successfully');
         expect(result).toContain(projectName);
@@ -133,14 +144,15 @@ describe('init tool security tests', () => {
         'path\x00null'
       ];
 
-      for (const invalidPath of invalidInputs) {
+      for (const [i, invalidPath] of invalidInputs.entries()) {
         await expect(
           initTool.run(mockAbortSignal, {
             tool: { 
               name: 'init',
               arguments: { projectPath: invalidPath }
-            }
-          }, mockConfig)
+            },
+            id: BigInt(i + 5)
+          }, mockConfig, null)
         ).rejects.toThrow('Project initialization failed. Please check the project path and permissions.');
       }
     });
@@ -153,8 +165,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: longPath }
-          }
-        }, mockConfig)
+          },
+          id: 12n
+        }, mockConfig, null)
       ).rejects.toThrow('Project initialization failed. Please check the project path and permissions.');
     });
 
@@ -173,8 +186,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: validPath }
-          }
-        }, mockConfig);
+          },
+          id: 13n
+        }, mockConfig, null);
 
         expect(result).toContain('Project initialized successfully');
       } finally {
@@ -187,13 +201,14 @@ describe('init tool security tests', () => {
     it('should not expose sensitive file paths in error messages', async () => {
       // Mock fs operations to throw with sensitive path
       const mockFs = {
+        ...fs,
         readFile: async (path: string) => {
           throw new Error(`ENOENT: no such file or directory, open '${path}'`);
         },
         writeFile: async () => {},
         stat: async () => ({ isDirectory: () => false }),
         access: async () => { throw new Error('Access denied'); }
-      };
+      } as unknown as typeof fs;
 
       await withMock({ fs }, 'fs', mockFs, async () => {
         try {
@@ -201,14 +216,15 @@ describe('init tool security tests', () => {
             tool: { 
               name: 'init',
               arguments: { projectPath: 'test-path' }
-            }
-          }, mockConfig);
+            },
+            id: 14n
+          }, mockConfig, null);
         } catch (error) {
           expect(error).toBeInstanceOf(ToolError);
-          expect(error.message).toBe('Project initialization failed. Please check the project path and permissions.');
-          expect(error.message).not.toContain('/etc');
-          expect(error.message).not.toContain('/home');
-          expect(error.message).not.toContain('ENOENT');
+          expect((error as ToolError).message).toBe('Project initialization failed. Please check the project path and permissions.');
+          expect((error as ToolError).message).not.toContain('/etc');
+          expect((error as ToolError).message).not.toContain('/home');
+          expect((error as ToolError).message).not.toContain('ENOENT');
         }
       });
     });
@@ -237,8 +253,9 @@ describe('init tool security tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: 'test-project' }
-          }
-        }, mockConfig);
+          },
+          id: 15n
+        }, mockConfig, null);
 
         expect(result).toContain('Project initialized successfully');
         
@@ -278,13 +295,14 @@ describe('init tool security tests', () => {
 
       try {
         // Run multiple init operations concurrently
-        const promises = Array(5).fill(0).map(() => 
+        const promises = Array(5).fill(0).map((_, i) => 
           initTool.run(mockAbortSignal, {
             tool: { 
               name: 'init',
               arguments: { projectPath: 'race-test' }
-            }
-          }, mockConfig)
+            },
+            id: BigInt(16 + i)
+          }, mockConfig, null)
         );
 
         const results = await Promise.allSettled(promises);
@@ -311,7 +329,16 @@ describe('init tool functional tests', () => {
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'init-func-test-'));
-    mockConfig = { mcpServers: {} } as Config;
+    mockConfig = {
+      yourName: 'test-user',
+      models: [{
+        nickname: 'test-model',
+        baseUrl: 'http://localhost',
+        model: 'test',
+        context: 4096
+      }],
+      mcpServers: {}
+    } as Config;
     mockAbortSignal = new AbortController().signal;
   });
 
@@ -385,8 +412,9 @@ describe('init tool functional tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: 'typescript-project' }
-          }
-        }, mockConfig);
+          },
+          id: 21n
+        }, mockConfig, null);
 
         expect(result).toContain('Project initialized successfully');
         expect(result).toContain('typescript-project');
@@ -443,8 +471,9 @@ describe('init tool functional tests', () => {
           tool: { 
             name: 'init',
             arguments: { projectPath: 'minimal-project' }
-          }
-        }, mockConfig);
+          },
+          id: 22n
+        }, mockConfig, null);
 
         expect(result).toContain('Project initialized successfully');
         
@@ -477,8 +506,9 @@ describe('init tool functional tests', () => {
           tool: { 
             name: 'init',
             arguments: {} // No projectPath provided
-          }
-        }, mockConfig);
+          },
+          id: 23n
+        }, mockConfig, null);
 
         expect(result).toContain('Project initialized successfully');
         

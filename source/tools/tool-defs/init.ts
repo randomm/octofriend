@@ -108,8 +108,8 @@ async function analyzeProject(projectPath: string): Promise<{
         projectInfo.structure[dir] = "directory";
       }
     } catch (error) {
-      // Log but don't expose error details
-      console.debug(`Directory check failed for ${dir}`);
+      // Log but don't expose error details - directory doesn't exist, which is normal
+      // Removed console.debug to avoid cluttering production output
     }
   }
 
@@ -246,15 +246,13 @@ export default {
         throw new ToolError('Failed to write project documentation file. Please check permissions.');
       }
       
-      return `✅ Project initialized successfully!
-
-Generated OCTO.md with:
-- Project: ${projectInfo.name}
-- Features: ${projectInfo.features.join(", ") || "none detected"}
-- MCP Servers: ${mcpInfo.length} configured
-- File: OCTO.md
-
-The OCTO.md file contains comprehensive project documentation including available MCP tools.`;
+      return "✅ Project initialized successfully!\n\n" +
+        "Generated OCTO.md with:\n" +
+        "- Project: " + projectInfo.name + "\n" +
+        "- Features: " + (projectInfo.features.join(", ") || "none detected") + "\n" +
+        "- MCP Servers: " + mcpInfo.length + " configured\n" +
+        "- File: OCTO.md\n\n" +
+        "The OCTO.md file contains comprehensive project documentation including available MCP tools.";
     } catch (error) {
       console.error('Project initialization failed:', error);
       throw new ToolError('Project initialization failed. Please check the project path and permissions.');
