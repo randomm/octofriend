@@ -14,14 +14,43 @@ const Schema = t.subtype({
   arguments: ArgumentsSchema,
 }).comment("Initialize project documentation by analyzing structure and discovering MCP tools");
 
+function validateProjectPath(projectPath: string): void {
+  // Check for dangerous characters
+  const dangerousChars = /[;&|`$(){}[\]\\<>'"]/;
+  if (dangerousChars.test(projectPath)) {
+    throw new ToolError("Invalid path characters detected");
+  }
+  
+  // Check length
+  if (projectPath.length > 255) {
+    throw new ToolError("Path too long");
+  }
+  
+  // Check for null bytes
+  if (projectPath.includes('\0')) {
+    throw new ToolError("Null bytes not allowed in path");
+  }
+}
+
+function validateAndResolvePath(basePath: string, ...segments: string[]): string {
+  const resolved = path.resolve(basePath, ...segments);
+  const baseResolved = path.resolve(basePath);
+  
+  if (!resolved.startsWith(baseResolved + path.sep) && resolved !== baseResolved) {
+    throw new ToolError(`Path traversal detected: ${segments.join('/')}`);
+  }
+  return resolved;
+}
+
 async function analyzeProject(projectPath: string): Promise<{
   name: string;
   description: string;
   features: string[];
   structure: Record<string, string>;
 }> {
-  const packageJsonPath = path.join(projectPath, "package.json");
-  const tsconfigPath = path.join(projectPath, "tsconfig.json");
+  const safeProjectPath = validateAndResolvePath(process.cwd(), projectPath);
+  const packageJsonPath = validateAndResolvePath(safeProjectPath, "package.json");
+  const tsconfigPath = validateAndResolvePath(safeProjectPath, "tsconfig.json");
   
   let projectInfo = {
     name: path.basename(projectPath),
@@ -66,16 +95,21 @@ async function analyzeProject(projectPath: string): Promise<{
   }
 
   // Check for common directories
+  const ALLOWED_DIRS = new Set(["src", "source", "lib", "dist", "build", "test", "tests", "__tests__"]);
   const commonDirs = ["src", "source", "lib", "dist", "build", "test", "tests", "__tests__"];
+  
   for (const dir of commonDirs) {
+    if (!ALLOWED_DIRS.has(dir)) continue; // Additional safety check
+    
     try {
-      const dirPath = path.join(projectPath, dir);
+      const dirPath = validateAndResolvePath(safeProjectPath, dir);
       const stat = await fs.stat(dirPath);
       if (stat.isDirectory()) {
         projectInfo.structure[dir] = "directory";
       }
-    } catch {
-      // Directory doesn't exist
+    } catch (error) {
+      // Log but don't expose error details
+      console.debug(`Directory check failed for ${dir}`);
     }
   }
 
@@ -185,9 +219,15 @@ export default {
   ArgumentsSchema,
   validate: async () => null,
   async run(abortSignal, call, config, modelOverride) {
-    const { projectPath = process.cwd() } = call.tool.arguments;
+    const { projectPath = "." } = call.tool.arguments;
     
     try {
+      // Validate input first
+      validateProjectPath(projectPath);
+      
+      // Get safe project path for file operations
+      const safeProjectPath = validateAndResolvePath(process.cwd(), projectPath);
+      
       // Analyze the project
       const projectInfo = await analyzeProject(projectPath);
       
@@ -198,7 +238,7 @@ export default {
       const octoContent = generateOctoMd(projectInfo, mcpInfo);
       
       // Write OCTO.md file
-      const octoPath = path.join(projectPath, "OCTO.md");
+      const octoPath = validateAndResolvePath(safeProjectPath, "OCTO.md");
       await fs.writeFile(octoPath, octoContent, "utf-8");
       
       return `✅ Project initialized successfully!
@@ -207,11 +247,12 @@ Generated OCTO.md with:
 - Project: ${projectInfo.name}
 - Features: ${projectInfo.features.join(", ") || "none detected"}
 - MCP Servers: ${mcpInfo.length} configured
-- File: ${octoPath}
+- File: OCTO.md
 
 The OCTO.md file contains comprehensive project documentation including available MCP tools.`;
     } catch (error) {
-      throw new ToolError(`Failed to initialize project: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Project initialization failed:', error);
+      throw new ToolError('Project initialization failed. Please check the project path and permissions.');
     }
   },
 } satisfies ToolDef<t.GetType<typeof Schema>>;
