@@ -246,7 +246,7 @@ export default {
         throw new ToolError('Failed to write project documentation file. Please check permissions.');
       }
       
-      return "✅ Project initialized successfully!\n\n" +
+      return "Project initialized successfully!\n\n" +
         "Generated OCTO.md with:\n" +
         "- Project: " + projectInfo.name + "\n" +
         "- Features: " + (projectInfo.features.join(", ") || "none detected") + "\n" +
