@@ -239,7 +239,12 @@ export default {
       
       // Write OCTO.md file
       const octoPath = validateAndResolvePath(safeProjectPath, "OCTO.md");
-      await fs.writeFile(octoPath, octoContent, "utf-8");
+      try {
+        await fs.writeFile(octoPath, octoContent, "utf-8");
+      } catch (writeError) {
+        console.error('Failed to write OCTO.md:', writeError);
+        throw new ToolError('Failed to write project documentation file. Please check permissions.');
+      }
       
       return `✅ Project initialized successfully!
 
