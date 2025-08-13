@@ -63,6 +63,47 @@ export const useAppStore = create<UiState>((set, get) => ({
   modelOverride: null,
 
   input: async ({ config, query }) => {
+    // Check if this is a slash command
+    if (query.trim().startsWith('/')) {
+      const trimmed = query.trim().slice(1); // Remove '/'
+      const [command, ...args] = trimmed.split(' ');
+      
+      if (command === 'init') {
+        // Handle /init command directly as a tool call
+        const toolCallId = sequenceId().toString();
+        const toolCallItem: ToolCallItem = {
+          type: "tool",
+          id: sequenceId(),
+          tool: {
+            type: "function",
+            function: {
+              name: "init",
+              arguments: {
+                projectPath: args.length > 0 ? args.join(' ') : undefined,
+              }
+            },
+            toolCallId: toolCallId
+          }
+        };
+        
+        const userMessage: UserItem = {
+          type: "user",
+          id: sequenceId(),
+          content: query,
+        };
+
+        let history = [
+          ...get().history,
+          userMessage,
+          toolCallItem,
+        ];
+        
+        set({ history });
+        await get().runTool({ config, toolReq: toolCallItem });
+        return;
+      }
+    }
+
     const userMessage: UserItem = {
 			type: "user",
       id: sequenceId(),

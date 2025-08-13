@@ -19,6 +19,7 @@ import {
   create as createTool,
   mcp,
   fetch as fetchTool,
+  init,
   SKIP_CONFIRMATION,
 } from "./tools/index.ts";
 import { useShallow } from "zustand/react/shallow";
@@ -381,6 +382,7 @@ function ToolMessageRenderer({ item }: { item: ToolCallItem }) {
     case "create": return <CreateToolRenderer item={item.tool.function} />
     case "mcp": return <McpToolRenderer item={item.tool.function} />
     case "fetch": return <FetchToolRenderer item={item.tool.function} />
+    case "init": return <InitToolRenderer item={item.tool.function} />
   }
 }
 
@@ -483,6 +485,14 @@ function McpToolRenderer({ item }: { item: t.GetType<typeof mcp.Schema> }) {
       <Text color={themeColor}>Server: {item.arguments.server}, Tool: {item.arguments.tool}</Text>
     </Box>
     <Text color="gray">Arguments: {JSON.stringify(item.arguments.arguments)}</Text>
+  </Box>
+}
+
+function InitToolRenderer({ item }: { item: t.GetType<typeof init.Schema> }) {
+  const themeColor = useColor();
+  return <Box>
+    <Text color="gray">{item.name}: </Text>
+    <Text color={themeColor}>{item.arguments.projectPath || "current directory"}</Text>
   </Box>
 }
 

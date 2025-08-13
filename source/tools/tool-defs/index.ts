@@ -5,3 +5,4 @@ export { default as edit } from "./edit.ts";
 export { default as create } from "./create.ts";
 export { default as mcp } from "./mcp.ts";
 export { default as fetch } from "./fetch.ts";
+export { default as init } from "./init.ts";

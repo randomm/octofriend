@@ -222,6 +222,16 @@ function collapseToIR(
         case "list":
         case "bash":
         case "mcp":
+        case "init":
+          return [
+            prev,
+            {
+              role: "tool-output",
+              content: item.content,
+              toolCall: prev.toolCall,
+            }
+          ];
+        default:
           return [
             prev,
             {
