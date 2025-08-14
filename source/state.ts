@@ -69,21 +69,17 @@ export const useAppStore = create<UiState>((set, get) => ({
       const [command, ...args] = trimmed.split(' ');
       
       if (command === 'init') {
-        // Handle /init command directly as a tool call
+        // Handle /init command as a complete conversation flow
         const toolCallId = sequenceId().toString();
-        const toolCallItem: ToolCallItem = {
-          type: "tool",
-          id: sequenceId(),
-          tool: {
-            type: "function",
-            function: {
-              name: "init",
-              arguments: {
-                projectPath: args.length > 0 ? args.join(' ') : undefined,
-              }
-            },
-            toolCallId: toolCallId
-          }
+        const toolCallRequest = {
+          type: "function" as const,
+          function: {
+            name: "init" as const,
+            arguments: {
+              projectPath: args.length > 0 ? args.join(' ') : undefined,
+            }
+          },
+          toolCallId: toolCallId
         };
         
         const userMessage: UserItem = {
@@ -92,9 +88,24 @@ export const useAppStore = create<UiState>((set, get) => ({
           content: query,
         };
 
+        // Create an assistant message and tool call item that will be collapsed by toLlmIR
+        const assistantMessage: AssistantItem = {
+          type: "assistant",
+          id: sequenceId(),
+          content: `I'll initialize the project documentation for you.`,
+          tokenUsage: 0, // No real LLM tokens used for slash commands
+        };
+
+        const toolCallItem: ToolCallItem = {
+          type: "tool",
+          id: sequenceId(),
+          tool: toolCallRequest
+        };
+
         let history = [
           ...get().history,
           userMessage,
+          assistantMessage,
           toolCallItem,
         ];
         
@@ -254,6 +265,8 @@ export const useAppStore = create<UiState>((set, get) => ({
 
     let history: HistoryItem[];
     const modelConfig = getModelFromConfig(config, get().modelOverride);
+    
+    
     try {
       const run = (() => {
         if(modelConfig.type == null || modelConfig.type === "standard") return runAgent;
@@ -313,6 +326,7 @@ export const useAppStore = create<UiState>((set, get) => ({
         });
         return;
       }
+
 
       logger.error("verbose", e);
       set({
