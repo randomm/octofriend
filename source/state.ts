@@ -63,6 +63,58 @@ export const useAppStore = create<UiState>((set, get) => ({
   modelOverride: null,
 
   input: async ({ config, query }) => {
+    // Check if this is a slash command
+    if (query.trim().startsWith('/')) {
+      const trimmed = query.trim().slice(1); // Remove '/'
+      const [command, ...args] = trimmed.split(' ');
+      
+      if (command === 'init') {
+        // Handle /init command as a complete conversation flow
+        const toolCallId = sequenceId().toString();
+        const toolCallRequest = {
+          type: "function" as const,
+          function: {
+            name: "init" as const,
+            arguments: {
+              projectPath: args.length > 0 ? args.join(' ') : undefined,
+            }
+          },
+          toolCallId: toolCallId
+        };
+        
+        const userMessage: UserItem = {
+          type: "user",
+          id: sequenceId(),
+          content: query,
+        };
+
+        // Create an assistant message and tool call item that will be collapsed by toLlmIR
+        const assistantMessage: AssistantItem = {
+          type: "assistant",
+          id: sequenceId(),
+          content: `I'll initialize the project documentation for you.`,
+          tokenUsage: 0, // No real LLM tokens used for slash commands
+        };
+
+        const toolCallItem: ToolCallItem = {
+          type: "tool",
+          id: sequenceId(),
+          tool: toolCallRequest
+        };
+
+        let history = [
+          ...get().history,
+          userMessage,
+          assistantMessage,
+          toolCallItem,
+        ];
+        
+        set({ history });
+        await get().runTool({ config, toolReq: toolCallItem });
+        return;
+      }
+    }
+
     const userMessage: UserItem = {
 			type: "user",
       id: sequenceId(),
@@ -213,6 +265,8 @@ export const useAppStore = create<UiState>((set, get) => ({
 
     let history: HistoryItem[];
     const modelConfig = getModelFromConfig(config, get().modelOverride);
+    
+    
     try {
       const run = (() => {
         if(modelConfig.type == null || modelConfig.type === "standard") return runAgent;
@@ -272,6 +326,7 @@ export const useAppStore = create<UiState>((set, get) => ({
         });
         return;
       }
+
 
       logger.error("verbose", e);
       set({
